@@ -26,7 +26,7 @@ import qrcode
 
 for i in range(1, 601):
     # URL은 나중에 안내 페이지로 바꿀 수 있음
-    url = f"http://localhost:5000/scan?id={i}"
+    url = f"https://koko1324.github.io/2025forQRinfoPage/?id={i}"
     qr = qrcode.QRCode(version=1, box_size=10, border=4)
     qr.add_data(url)
     qr.make(fit=True)
