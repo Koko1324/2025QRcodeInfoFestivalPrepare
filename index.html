@@ -3,86 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Refresh" content="10">
     <title>실시간 출석 현황</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/odometer.js/0.4.8/themes/odometer-theme-default.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/odometer.js/0.4.8/odometer.min.js"></script>
+
     <style>
-        body {
-            font-family: sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            background-color: #f0f2f5;
-            margin: 0;
-            padding: 20px;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 20px;
-            background-color: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        h1 {
-            margin: 0;
-            color: #333;
-        }
-        #total-count {
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #f0f2f5; margin: 0; padding: 20px; }
+        .header { text-align: center; margin-bottom: 20px; background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        h1 { margin: 0; color: #333; }
+        
+        /* Odometer 스타일 지정 */
+        .odometer {
             font-size: 3em;
             font-weight: bold;
             color: #007bff;
             margin-top: 10px;
         }
-        .circle-container {
-            display: grid;
-            grid-template-columns: repeat(30, 1fr); /* 30개의 열 */
-            gap: 8px; /* 원 사이의 간격 */
-            width: 100%;
-            max-width: 1200px; /* 최대 너비 설정 */
-            padding: 20px;
-            background-color: #fff;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        .circle {
-            width: 100%;
-            padding-bottom: 100%; /* 너비와 높이를 같게 만드는 트릭 */
-            border-radius: 50%;
-            background-color: #e0e0e0; /* 기본 회색 */
-            transition: background-color 0.3s ease;
-        }
+
+        .circle-container { display: grid; grid-template-columns: repeat(30, 1fr); gap: 8px; width: 100%; max-width: 1200px; padding: 20px; background-color: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        .circle { width: 100%; padding-bottom: 100%; border-radius: 50%; background-color: #e0e0e0; transition: background-color 0.3s ease; }
     </style>
 </head>
 <body>
 
     <div class="header">
         <h1>총 출석 인원</h1>
-        <p id="total-count">0</p>
+        <p id="total-count" class="odometer">0</p>
     </div>
 
-    <div class="circle-container" id="circle-container">
-        </div>
+    <div class="circle-container" id="circle-container"></div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
     <script>
-        // 1. Firebase 설정: 본인의 Firebase 프로젝트 설정으로 교체하세요.
         const firebaseConfig = {
             apiKey: "AIzaSyCoHQY_1Gk06eRD8KizPo_e_25RX26vr4M",
             authDomain: "infoqrpeople.firebaseapp.com",
             projectId: "infoqrpeople",
-            storageBucket: "infoqrpeople.firebasestorage.app",
+            storageBucket: "infoqrpeople.appspot.com",
             messagingSenderId: "449767938743",
             appId: "1:449767938743:web:9420b3915473864bcd8b32",
             measurementId: "G-0F44C7E2LB"
         };
 
-        // Firebase 앱 초기화
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // 2. 색상표 데이터 (제공된 CSV 파일 기반)
         const colorPalette = {
             1: "rgb(0,0,0)",
             2: "rgb(0,0,28)",
@@ -1585,15 +1553,19 @@
             1499: "rgb(255,252,224)",
             1500: "rgb(255,252,252)"
         };
-        // 참고: 용량 문제로 색상표 데이터 일부를 생략했습니다. 실제로는 1500개 전체 데이터가 필요합니다.
-        // 전체 색상표 데이터는 별도 파일로 관리하거나, 필요 시 요청하시면 다시 생성해 드립니다.
 
-        // 3. 웹 페이지 요소 가져오기
         const totalCountElement = document.getElementById('total-count');
         const circleContainer = document.getElementById('circle-container');
         const circles = [];
 
-        // 4. 회색 원 1500개 생성
+        // Odometer 인스턴스 생성 (애니메이션 적용)
+        const od = new Odometer({
+            el: totalCountElement,
+            value: 0,
+            format: 'd',
+            duration: 500
+        });
+
         for (let i = 0; i < 1500; i++) {
             const circle = document.createElement('div');
             circle.classList.add('circle');
@@ -1601,17 +1573,15 @@
             circles.push(circle);
         }
 
-        // 5. Firebase 데이터 실시간 감지 및 화면 업데이트
-        
         // 총 인원수 감지
         db.collection('attendance').doc('total')
             .onSnapshot((doc) => {
                 if (doc.exists) {
                     const count = doc.data().count;
-                    totalCountElement.textContent = count;
+                    od.update(count); // Odometer 업데이트
                 } else {
                     console.log("total 문서가 없습니다.");
-                    totalCountElement.textContent = 0;
+                    od.update(0);
                 }
             }, (error) => {
                 console.error("총 인원수 읽기 오류: ", error);
@@ -1622,28 +1592,24 @@
             .onSnapshot((doc) => {
                 if (doc.exists) {
                     const scannedData = doc.data();
-                    const scannedIds = Object.keys(scannedData); // ex: ["104", "107", ...]
+                    const scannedIds = Object.keys(scannedData);
 
-                    // 먼저 모든 원을 기본 회색으로 초기화
                     circles.forEach(circle => {
                         circle.style.backgroundColor = '#e0e0e0';
                     });
                     
-                    // 스캔된 ID 순서대로 원을 색칠
                     scannedIds.forEach((id, index) => {
-                        if (index < circles.length) { // 1500개가 넘지 않도록 방지
-                            const color = colorPalette[id] || '#000000'; // 색상표에 없으면 검은색
+                        if (index < circles.length) {
+                            const color = colorPalette[id] || '#000000';
                             circles[index].style.backgroundColor = color;
                         }
                     });
-
                 } else {
                     console.log("scanned_ids 문서가 없습니다.");
                 }
             }, (error) => {
                 console.error("스캔 ID 읽기 오류: ", error);
             });
-
     </script>
 </body>
 </html>
