@@ -4,7 +4,8 @@ import time
 import re
 import firebase_admin
 from firebase_admin import credentials, firestore
-
+from PIL import ImageFont, ImageDraw, Image
+import numpy as np
 # ------------------------------
 # Firebase 초기화
 # ------------------------------
@@ -50,21 +51,49 @@ def extract_id_from_url(qr_data):
     match = re.search(r"id=(\d+)", qr_data)
     return int(match.group(1)) if match else None
 
-def scan_qr():
+# ✅ 카메라 초기화 함수 (재시작용)
+def open_camera():
     cap = cv2.VideoCapture(1)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    if not cap.isOpened():
+        print("❌ 카메라 열기 실패. 1초 후 재시도...")
+        time.sleep(1)
+        return open_camera()
+    print("📷 카메라 연결 완료.")
+    return cap
+
+def scan_qr():
+    cap = open_camera()
     print("QR코드를 카메라에 보여주세요... (종료: q)")
 
     last_code = None
     last_time = 0
-    detected_time = 0  # 'Detected!' 표시를 위한 타이머
+    detected_time = 0  # '감지됨!' 표시를 위한 타이머
+    failure_count = 0  # 연속 실패 횟수
+
+    # ✅ 한글 폰트 설정 (Windows 기준: 맑은 고딕 사용)
+    fontpath = "C:/Windows/Fonts/malgunbd.ttf"  # 또는 "malgun.ttf"
+    font = ImageFont.truetype(fontpath, 40)  # 글자 크기 40
 
     while True:
         ret, frame = cap.read()
-        if not ret:
-            continue
 
+        if not ret:
+            failure_count += 1
+            print(f"⚠️ 프레임 읽기 실패 ({failure_count}회)")
+            time.sleep(0.5)
+
+            if failure_count >= 5:
+                print("🔄 카메라 재연결 중...")
+                cap.release()
+                cap = open_camera()
+                failure_count = 0
+            continue
+        else:
+            failure_count = 0
+
+        # QR 코드 인식
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         qr_codes = decode(gray)
 
@@ -75,31 +104,35 @@ def scan_qr():
                 user_id = extract_id_from_url(qr_data)
                 if user_id:
                     increment_if_new(user_id)
-                    detected_time = time.time()  # 인식 시각 기록
+                    detected_time = time.time()
                 else:
                     print("❌ QR 코드에서 ID를 추출할 수 없습니다.")
                 last_code = qr_data
                 last_time = time.time()
 
-        # QR 인식되었을 때 화면에 표시 (1초 동안)
+        # ✅ '감지됨!' 한글 표시 (1초 유지)
         if time.time() - detected_time < 1:
-            cv2.putText(frame, "Detected!", (230, 50),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3, cv2.LINE_AA)
+            # OpenCV → PIL 변환
+            frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            draw = ImageDraw.Draw(frame_pil)
+            draw.text((230, 30), "감지됨!", font=font, fill=(0, 255, 0))  # 초록색 글자
+            frame = cv2.cvtColor(np.array(frame_pil), cv2.COLOR_RGB2BGR)
 
         cv2.imshow("QR Scanner", frame)
+
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
 
     cap.release()
     cv2.destroyAllWindows()
 
+# ------------------------------
+# Firestore 실시간 동기화
+# ------------------------------
 def get_attendance():
     total = get_total_count()
     print(f"현재 누적 인원: {total}명")
 
-# ------------------------------
-# 실시간 동기화 콜백
-# ------------------------------
 def on_snapshot(doc_snapshot, changes, read_time):
     for doc in doc_snapshot:
         data = doc.to_dict()
