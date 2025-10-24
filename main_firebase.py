@@ -57,7 +57,7 @@ def extract_id_from_url(qr_data):
 
 # ✅ 카메라 초기화 함수 (재시작용)
 def open_camera():
-    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)  # 인덱스 0 기본 / 윈도우용 안정화
+    cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)  # 인덱스 0 기본 / 윈도우용 안정화
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
     if not cap.isOpened():
@@ -169,3 +169,4 @@ if __name__ == "__main__":
             break
         else:
             print("명령어는 scan, get, exit 중 하나를 입력하세요.")
+
