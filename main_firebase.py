@@ -25,7 +25,6 @@ def get_total_count():
     return 0
 
 def increment_if_new(user_id):
-    """새로운 QR ID일 경우에만 count 증가"""
     scanned_doc = scanned_ref.get()
     scanned_ids = scanned_doc.to_dict() if scanned_doc.exists else {}
 
@@ -34,7 +33,6 @@ def increment_if_new(user_id):
         print(f"⚠️ 이미 인식된 ID입니다: {str_id}")
         return False
 
-    # Firestore에 새 ID 추가 및 count 증가
     scanned_ref.set({str_id: True}, merge=True)
 
     total_doc = total_ref.get()
@@ -60,6 +58,7 @@ def scan_qr():
 
     last_code = None
     last_time = 0
+    detected_time = 0  # 'Detected!' 표시를 위한 타이머
 
     while True:
         ret, frame = cap.read()
@@ -76,10 +75,16 @@ def scan_qr():
                 user_id = extract_id_from_url(qr_data)
                 if user_id:
                     increment_if_new(user_id)
+                    detected_time = time.time()  # 인식 시각 기록
                 else:
                     print("❌ QR 코드에서 ID를 추출할 수 없습니다.")
                 last_code = qr_data
                 last_time = time.time()
+
+        # QR 인식되었을 때 화면에 표시 (1초 동안)
+        if time.time() - detected_time < 1:
+            cv2.putText(frame, "Detected!", (230, 50),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3, cv2.LINE_AA)
 
         cv2.imshow("QR Scanner", frame)
         if cv2.waitKey(1) & 0xFF == ord("q"):
